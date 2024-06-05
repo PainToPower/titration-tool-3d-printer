@@ -1,0 +1,140 @@
+import serial
+import time
+#import threading
+
+COMMANDBUFFERSIZE = 300
+
+class Controller:
+    def __init__(self):
+        print("Controller Created")
+
+    def connect_to_port(self, serial_port):
+        try:
+            self.hSerial = serial.Serial(serial_port, baudrate=115200, timeout=0.05)
+            print("Successfully Connected to Serial Port:", serial_port)
+        except serial.SerialException:
+            print("Serial port not found.")
+
+    def send_and_receive(self, command):
+        self.hSerial.write((command + "\n").encode())
+        response = b""
+        while True:
+            response += self.hSerial.read(COMMANDBUFFERSIZE)
+            if "ok\n" in response.decode():
+                break
+            
+    
+
+        print(response.decode())
+    
+    def send_with_delay(self, command, delay):
+        time.sleep(delay)
+        self.send_and_receive(command)
+        
+    def testing(self):           
+        szBuff = "G0 Z20"
+        self.send_and_receive(szBuff)
+        
+        time.sleep(10)
+                    
+        szBuff = "G0 Z90"
+        self.send_and_receive(szBuff)
+        time.sleep(5)
+        
+        
+    #MAINLY THE FUNCTIONS TO CONTROL PRINTER MOVEMENT 
+
+    def fecth_buffer(self):
+        szBuff = "G0 X30 Y150 Z90 F9000" #Change X and Y to buffer flask location             
+        self.send_and_receive(szBuff)
+        
+    
+        szBuff = "G0 Z20"
+        self.send_and_receive(szBuff)
+     
+        self.syringe_retract()
+                    
+        szBuff = "G0 Z90"
+        self.send_and_receive(szBuff)
+          
+        time.sleep(5)
+    
+ 
+            
+    def mixing(self, repeat_times = 3, up_duration = 1, down_duration = 1):    
+        
+        for _ in range (repeat_times):
+            
+            szBuffUp = "G1 Z30 F9000"
+            self.send_and_receive(szBuffUp)
+            time.sleep(up_duration)
+            
+            szBuffDown = "G1 Z35 F9000"
+            self.send_and_receive(szBuffDown)
+            time.sleep(down_duration)
+        
+        
+             
+    def buffer_move(self, userFactor, userNoSample):
+        self.send_and_receive("G28")
+        
+        self.fecth_buffer()
+        
+        baseString = "G1 X%d Y%d F9000"
+       
+        for x in range(21, 21 + ((userFactor) * 10), +10):
+            for y in range(3, 3 + ((userNoSample) * 10), 10):        
+                szBuff = baseString % (x, y)
+                
+                self.send_and_receive(szBuff)
+        
+                szBuff = "G1 Z10 F9000"
+                self.send_and_receive(szBuff)
+            
+                self.syringe_extract()
+                
+                
+                szBuff = "G1 Z30 F9000"
+                self.send_and_receive(szBuff)
+            
+                              
+            time.sleep(5)
+    
+            
+    def serial_dilution(self, userFactor, userNoSample):
+        baseString = "G1 X%d Y%d F9000"
+        
+        self.send_and_receive("G28")
+        
+        for x in range(21, 21 + ((userFactor) * 10), +10):
+            for y in range(3, 3 + ((userNoSample) * 10), 10):
+                
+                szBuff = baseString % (x, y)
+                
+                self.send_and_receive(szBuff)
+
+            
+                szBuff = "G1 Z10 F9000"
+                self.send_and_receive(szBuff)
+
+                #A time delay for the syringe pump
+                self.send_and_receive("G4 P6000")
+                #mixing the buffer with bacteria sample
+                self.mixing()
+                
+                
+                szBuff = "G1 Z30 F9000"
+                self.send_and_receive(szBuff)
+                             
+            time.sleep(5)
+            
+
+   #for y in range(73, 73 - ((userFactor) * 10), - 10): 
+            #for x in range(68, 68 + (10 * (userNoSample)), 10):   
+        
+    def syringe_retract(self):
+        self.send_and_receive("G1 E-16.2")
+        
+    def syringe_extract(self):
+        self.send_and_receive("G1 E16.2")
+        
